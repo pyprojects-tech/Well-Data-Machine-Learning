@@ -66,14 +66,24 @@ df[x_params_cat] = data[x_params_cat]
 df[y_params] = data[y_params]
 
 col11, col12, col13= st.beta_columns([1,1,1])
-min_val = np.min(df[y_params])
-max_val = np.max(df[y_params])
+
+min_val = float(np.min(df[y_params]))
+max_val = float(np.max(df[y_params]))
 
 with col11:
-    min_filt = st.slider('Minimum Filter Value for Model Parameter',min_val,max_val,min_val,key='minval')
+    min_filt = st.slider('Minimum Filter Value for Model Parameter',
+                         min_value = min_val,
+                         max_value = max_val,
+                         value = min_val,
+                         step = 1.0,
+                         )
 with col12:
-   max_filt = st.slider('Maximum Filter Value for Model Parameter',min_val,max_val,max_val,key='maxval')
-
+   max_filt = st.slider('Maximum Filter Value for Model Parameter',
+                         min_value = min_val,
+                         max_value = max_val,
+                         value = max_val,
+                         step = 1.0,
+                         )
 df = df[(df[y_params]>min_filt) & (df[y_params]<max_filt)]
 
 categorical_cols = x_params_cat
