@@ -24,9 +24,6 @@ import matplotlib.pyplot as plt
 import plotly.io as pio
 import plotly.graph_objects as go
 
-import seaborn as sns
-import matplotlib.pyplot as plt
-
 pio.templates.default = "ggplot2"
 plt.style.use('dark_background')
 
@@ -175,52 +172,98 @@ col01, col02, col03 = st.beta_columns([1,1,1])
 
 with col01:    
     n = st.slider('Number of Data Points to Plot',10,1000)
-   
+    
 with col02:
     st.write('Regression Type: '+fit_type)
-   
+    
+
 with col03:
     st.write("RMSE Score: "+str(np.round(error_calcs(),2)))
     
 col1, col2  = st.beta_columns([1,1])
    
-ydat = reg.predict(test_setx)[:n]
-xdat = test_sety[:n]  
+y = reg.predict(test_setx)[:n]
+x = test_sety[:n]  
 
-df1 = pd.DataFrame()
-df2 = pd.DataFrame()
-df_hist  = pd.DataFrame()
-
-df1['data']=xdat
-df1['label']='actual'
-
-df2['data']=ydat
-df2['label']='predicted'
-
-df_plot = pd.concat([df1,df2])
-
-df_hist['actual']=xdat
-df_hist['predicted']=ydat
 
 #Scatterplot for fit performance
 with col1:
     
-    plot = sns.regplot(x=df_plot['data'][df_plot['label'] =='actual'],
-                  y=df_plot['data'][df_plot['label'] =='predicted'],
-                  )
-    plot.set_xlim(left=min_filt, right=max_filt)
-    plot.set_ylim(bottom=min_filt, top=max_filt)
-    plot.set(xlabel='Actual Value', ylabel='Predicted Value',title='Regression Fit Scatterplot')
-    fig = plot.get_figure()
+    fig = go.Figure()
     
-    st.pyplot(fig,clear_figure=True)
+    fig.add_trace(go.Scatter(
+        x=x, y=y,
+        name='performance',
+        mode='markers',
+        marker_color='blue',
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=x, y=x,
+        name='ideal',
+        mode='lines',
+        marker_color='red',      
+    ))
+    
+    fig.update_layout(
+        title = 'Regression Fit Scatter Plot',
+        legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=-0.2,
+        xanchor="right",
+        x=0.65
+    ))
         
+    st.plotly_chart(fig)
 
 #Histogram for fit performance
 with col2:
     
-    plot2 = sns.histplot(df_hist,kde=True)
-    plot2.set(xlabel=str(y_params), title='Regression Fit Histogram')
-    fig2 = plot2.get_figure()
+    fig2 = go.Figure()
     
-    st.pyplot(fig2,clear_figure=True)
+    fig2.add_trace(go.Histogram(
+        x=x, 
+        name='Actual', 
+        opacity=0.75,
+        marker_color='red'
+    ))
+    
+    
+    fig2.add_trace(go.Histogram(
+        x=y, 
+        name='Predicted', 
+        opacity=0.75,
+        marker_color='blue',
+    ))
+              
+    
+    fig2.update_layout(barmode='overlay')
+    
+    
+    fig.add_trace(go.Histogram(
+        x=y,
+        name='predicted',
+        marker_color='red',
+
+    ))
+    
+    fig.add_trace(go.Histogram(
+        x=x,
+        name='actual',
+        marker_color='blue',
+    ))
+    
+    fig2.update_layout(
+        title = 'Regression Fit Histogram',        
+        legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=-0.2,
+        xanchor="right",
+        x=0.65
+    ))
+    
+    fig2.update_traces(opacity=0.4)
+
+    st.plotly_chart(fig2)
