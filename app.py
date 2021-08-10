@@ -26,6 +26,7 @@ import plotly.graph_objects as go
 
 import seaborn as sns
 import matplotlib.pyplot as plt
+import ast 
 
 pio.templates.default = "ggplot2"
 plt.style.use('dark_background')
@@ -61,8 +62,6 @@ with col002:
 with col003:
         y_params = st.selectbox('Model Parameter', data.columns)
         
-
-
 df = pd.DataFrame()
 df[x_params_num] = data[x_params_num]
 df[x_params_cat] = data[x_params_cat]
@@ -224,3 +223,12 @@ with col2:
     fig2 = plot2.get_figure()
     
     st.pyplot(fig2,clear_figure=True)
+
+opt = ast.literal_eval(st.text_input('Optimization Parameters',d2))
+
+if st.button('Randomized Grid Search Optimization'):
+    gsearch = RandomizedSearchCV(reg,opt)
+    gsearch.fit(train_setx,train_sety)
+    gresults = pd.DataFrame(gsearch.cv_results_)
+    st.write(gresults)
+    
