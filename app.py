@@ -2,9 +2,25 @@ import streamlit as st
 
 #import regression models
 from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import RANSACRegressor
+from sklearn.linear_model import TheilSenRegressor
+from sklearn.linear_model import HuberRegressor
+from sklearn.linear_model import Ridge
+from sklearn.linear_model import ElasticNet
+from sklearn.linear_model import OrthogonalMatchingPursuit
+from sklearn.linear_model import SGDRegressor
+from sklearn import linear_model
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.svm import LinearSVR
+from sklearn.svm import SVR
+from sklearn.svm import NuSVR
+from sklearn.neighbors import RadiusNeighborsRegressor
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.kernel_ridge import KernelRidge
+from sklearn.linear_model import PassiveAggressiveRegressor
+from sklearn.neural_network import MLPRegressor
 
 #import regression analysis models
 from sklearn.model_selection import train_test_split
@@ -16,43 +32,51 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 from scipy.stats import uniform
 from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV
+
+
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-import plotly.io as pio
-import plotly.graph_objects as go
-
 import seaborn as sns
 import matplotlib.pyplot as plt
 import ast 
 
-pio.templates.default = "ggplot2"
+st.set_page_config(layout="wide")
 plt.style.use('dark_background')
 
-st.set_page_config(layout="wide")
+reg_list = ['LinearRegression','KNeighborsRegressor','DecisionTreeRegressor','RandomForestRegressor',
+            'RANSACRegressor','TheilSenRegressor','HuberRegressor',
+            'LinearSVR', 'SVR','NuSVR', 'GaussianProcessRegressor', 'RadiusNeighborsRegressor',
+            'MLPRegressor','Ridge','KernelRidge','ElasticNet','SGDRegressor', 'PassiveAggressiveRegressor'
+            ]
+
+re_list = reg_list.sort()
 
 #Start of App Including Type and Raw Data
-st.title('Maine Well Data Machine Learning App')
+st.title('Machine Learning Data Testing App')
 
-@st.cache(allow_output_mutation=True)
+#@st.cache(allow_output_mutation=True,suppress_st_warning=True)
 def data_import():
-    data =  pd.read_csv('data3.csv',low_memory=False)
+    file =  st.file_uploader('Upload your data file (must be CSV)')
+    data = pd.read_csv(file)
+    # data0= data[['LATITUDE','LONGITUDE','WELL_DEPTH_FT','CASING_LENGTH_FT','WELL_YIELD_GPM','UNIT_AGE','ROCKTYPE1','ROCKTYPE2']].copy()
+    # data0['x'] = np.cos(data0['LATITUDE'])*np.cos(data0['LONGITUDE'])
+    # data0['y'] = np.cos(data0['LATITUDE'])*np.sin(data0['LONGITUDE'])
+    # data0['z'] = np.sin(data0['LATITUDE'])
     
-    data0= data[['LATITUDE','LONGITUDE','WELL_DEPTH_FT','CASING_LENGTH_FT','WELL_YIELD_GPM','UNIT_AGE','ROCKTYPE1','ROCKTYPE2']].copy()
-    data0['x'] = np.cos(data0['LATITUDE'])*np.cos(data0['LONGITUDE'])
-    data0['y'] = np.cos(data0['LATITUDE'])*np.sin(data0['LONGITUDE'])
-    data0['z'] = np.sin(data0['LATITUDE'])
+    # data['x'] = np.cos(data0['LATITUDE'])*np.cos(data0['LONGITUDE'])
+    # data['y'] = np.cos(data0['LATITUDE'])*np.sin(data0['LONGITUDE'])
+    # data['z'] = np.sin(data0['LATITUDE'])
     
-    data['x'] = np.cos(data0['LATITUDE'])*np.cos(data0['LONGITUDE'])
-    data['y'] = np.cos(data0['LATITUDE'])*np.sin(data0['LONGITUDE'])
-    data['z'] = np.sin(data0['LATITUDE'])
-    
-    return data0,data
+    # return data0,data
+    return data
 
-data0 =  data_import()[0]
-data =  data_import()[1]
+# data0 =  data_import()[0]
+# data =  data_import()[1]
+data =  data_import()
 
 col001, col002, col003  = st.beta_columns([1,1,1])
 with col001:
@@ -61,7 +85,7 @@ with col002:
     x_params_cat = st.multiselect('Categorical Input Values', data.columns)
 with col003:
         y_params = st.selectbox('Model Parameter', data.columns)
-        
+
 df = pd.DataFrame()
 df[x_params_num] = data[x_params_num]
 df[x_params_cat] = data[x_params_cat]
@@ -133,7 +157,7 @@ with data_expand:
 
 #Build Regression Selection to select regression type
 
-reg_list = ['LinearRegression','KNeighborsRegressor','DecisionTreeRegressor','RandomForestRegressor']
+
 fit_type = st.sidebar.selectbox('Select Regression Type',reg_list)
 
 
@@ -224,11 +248,45 @@ with col2:
     
     st.pyplot(fig2,clear_figure=True)
 
-opt = ast.literal_eval(st.text_input('Optimization Parameters',d2))
+grid_params = st.multiselect('Select GridSearch Params', d2.keys())
+grid_dict = {}
+grid_but = {}
+state=[]
 
-if st.button('Randomized Grid Search Optimization'):
-    gsearch = RandomizedSearchCV(reg,opt)
-    gsearch.fit(train_setx,train_sety)
-    gresults = pd.DataFrame(gsearch.cv_results_)
-    st.write(gresults)
+for keys in grid_params:
+    i=0
+    col = []
     
+    for i in range(len(grid_params)):
+        col.append(str('col')+str(i+1))
+    col  = st.beta_columns(i+1)
+    
+j=0
+for keysj in grid_params:
+    if params[keysj] == None:      
+        with col[j]:
+            grid_but[keysj] = st.text_input(keysj, [0,0],key=str('A')+str(j))
+            grid_dict[keysj] = ast.literal_eval(grid_but[keysj])
+            j+=1 
+    else:
+        with col[j]:
+            grid_but[keysj] = st.text_input(keysj, [0,0],key=str('A')+str(j))
+            grid_dict[keysj] = ast.literal_eval(grid_but[keysj])
+            j+=1
+
+grid_df=[]
+for keysi in grid_params:
+    grid_df.append('param_'+keysi)
+grid_df.append('rank_test_score')
+
+
+grid_button = st.button('Randomized Grid Search Optimization')
+@st.cache(suppress_st_warning=True)
+def grdsearch():
+    if grid_button:
+        gsearch = GridSearchCV(reg,grid_dict)
+        gsearch.fit(train_setx,train_sety)
+        gresults = pd.DataFrame(gsearch.cv_results_)
+        st.write(gresults[grid_df])
+        
+grdsearch()
