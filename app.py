@@ -35,13 +35,15 @@ from sklearn.model_selection import RandomizedSearchCV
 from sklearn.model_selection import GridSearchCV
 
 
+from itertools import product
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 import seaborn as sns
-import matplotlib.pyplot as plt
+
 import ast 
 
 st.set_page_config(layout="wide")
@@ -85,16 +87,17 @@ if file is not None:
         df[y_params] = data[y_params]
         min_val = float(np.min(df[y_params]))
         max_val = float(np.max(df[y_params]))
+        
         col11, col12, col13= st.beta_columns([1,1,1])
         with col11:
-            min_filt = st.slider('Minimum Filter Value for Model Parameter',
+            min_filt = st.number_input('Minimum Filter Value for Model Parameter, Data Min: '+str(np.round(min_val,2)),
                                  min_value = min_val,
                                  max_value = max_val,
                                  value = min_val,
                                  step = 1.0,
                                  )
         with col12:
-           max_filt = st.slider('Maximum Filter Value for Model Parameter',
+           max_filt = st.number_input('Maximum Filter Value for Model Parameter, Data Min: '+str(np.round(max_val,2)),
                                  min_value = min_val,
                                  max_value = max_val,
                                  value = max_val,
@@ -109,10 +112,7 @@ if file is not None:
     data_drop = data_g0.dropna()
     datax = data_drop.drop(columns=y_params,axis=1)
     datay= data_drop[y_params]
-    
-    
-    #datay_drop = datay.drop(labels=['LATITUDE','LONGITUDE','WELL_DEPTH_FT','CASING_LENGTH_FT','WELL_YIELD_GPM'],axis=1)
-    
+
     #Create a pipeline to call all of the transformations, when the pipeline is called it executes the steps sequentially
     
     t_size = st.sidebar.slider('Select Training Set Size %',0,100,50,key='t_size')
@@ -150,8 +150,7 @@ if file is not None:
         
         
         fit_type = st.sidebar.selectbox('Select Regression Type',reg_list)
-        
-        
+    
         #Build the regression model and call the regression
         reg0 = globals()[fit_type]()
         params = reg0.get_params()
@@ -188,7 +187,7 @@ if file is not None:
         col01, col02, col03 = st.beta_columns([1,1,1])
         
         with col01:    
-            n = st.slider('Number of Data Points to Plot',10,1000)
+            n = st.number_input('Number of Data Points to Plot',10,10000)
            
         with col02:
             st.write('Regression Type: '+fit_type)
@@ -281,3 +280,96 @@ if file is not None:
                 st.write(gresults[grid_df])
                 
         grdsearch()
+        
+        
+        #Build a new test and training set for graphing/manipulation purposes
+        df_par= df.dropna()
+        
+        train_setx0,test_setx0,train_sety0,test_sety0 = train_test_split(
+            df_par,
+            df_par[y_params],
+            test_size=t_size/100,random_state=42
+            )
+        
+        def reg_par(xpar,ypar,dat):
+             regpar = globals()[fit_type](**d2)
+             regpar.fit(xpar,ypar)          
+             return regpar.predict(dat)
+         
+        
+        n2 = st.number_input('Number^2 of Data Points to Plot',5,100)
+        
+    
+ 
+        col001, col002  = st.beta_columns([1,1])
+        with col001:
+            
+            model_par_1 = st.multiselect('Input Parameters for Model 1', x_params_num,key='par1')
+                
+            if len(model_par_1)==2:
+                x = np.linspace(df[model_par_1[0]].min(),df[model_par_1[0]].max(),n2)
+                y = np.linspace(df[model_par_1[1]].min(),df[model_par_1[1]].max(),n2)
+                
+                df_par = pd.DataFrame()
+                df_par['x'] = x
+                df_par['y'] = y
+    
+                prod = product(df_par['x'].unique(), df_par['y'].unique())
+                z_cols = [x for x in df_par.columns if x not in ('x', 'y')]
+                z = df_par[z_cols].drop_duplicates().values.tolist()
+                
+                df_par_full = pd.DataFrame([s + list(p) for p in prod for s in z],
+                                   columns=list(z_cols+['x', 'y'])).sort_values(list(z_cols+['x', 'y'])).drop_duplicates()
+                
+                
+                df_par_full['z'] = reg_par(test_setx0[model_par_1],test_sety0,df_par_full)
+                df_final = df_par_full.pivot_table(values='z', index='x', columns='y')
+                X,Y = np.meshgrid(df_final.index,df_final.columns)
+                
+                
+                fig3 = plt.figure(figsize=(12,6))
+                ax3 = Axes3D(fig3)
+             
+                surf3 = ax3.plot_surface(X,Y,df_final.values,cmap='jet')
+                fig3.colorbar(surf3, ax=ax3, shrink=0.5, aspect=10)
+                ax3.set_xlabel(model_par_1[0])
+                ax3.set_ylabel(model_par_1[1])
+                ax3.set_zlabel(y_params)
+                st.pyplot(fig3,clear_figure=True)
+        
+        with col002:
+            
+            model_par_2 = st.multiselect('Input Parameters for Model 2', x_params_num,key='par2')
+            
+            if len(model_par_2)==2:
+                x2 = np.linspace(df[model_par_2[0]].min(),df[model_par_2[0]].max(),n2)
+                y2 = np.linspace(df[model_par_2[1]].min(),df[model_par_2[1]].max(),n2)
+                
+                df_par2 = pd.DataFrame()
+                df_par2['x'] = x2
+                df_par2['y'] = y2
+    
+                prod = product(df_par2['x'].unique(), df_par2['y'].unique())
+                z_cols = [x2 for x2 in df_par2.columns if x2 not in ('x', 'y')]
+                z2 = df_par2[z_cols].drop_duplicates().values.tolist()
+                
+                df_par_full2 = pd.DataFrame([s + list(p) for p in prod for s in z2],
+                                   columns=list(z_cols+['x', 'y'])).sort_values(list(z_cols+['x', 'y'])).drop_duplicates()
+                
+                
+                df_par_full2['z'] = reg_par(test_setx0[model_par_2],test_sety0,df_par_full2)
+                df_final2 = df_par_full2.pivot_table(values='z', index='x', columns='y')
+                X2,Y2 = np.meshgrid(df_final2.index,df_final2.columns)
+                
+                
+                fig4 = plt.figure(figsize=(12,6))
+                ax4 = Axes3D(fig4)
+             
+                surf4 = ax4.plot_surface(X2,Y2,df_final2.values,cmap='jet')
+                fig4.colorbar(surf4, ax=ax4, shrink=0.5, aspect=10)
+                ax4.set_xlabel(model_par_2[0])
+                ax4.set_xlim(np.min(X2),np.max(X2))
+                ax4.set_ylabel(model_par_2[1])
+                ax4.set_ylim(np.min(Y2),np.max(Y2))
+                ax4.set_zlabel(y_params)
+                st.pyplot(fig4,clear_figure=True)
