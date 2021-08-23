@@ -44,12 +44,14 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.cm as cm 
 import matplotlib
 
+
 import seaborn as sns
 
 import ast 
 
 st.set_page_config(layout="wide")
 plt.style.use('dark_background')
+#matplotlib.pyplot.ion
 
 reg_list = ['LinearRegression','KNeighborsRegressor','DecisionTreeRegressor','RandomForestRegressor',
             'RANSACRegressor','TheilSenRegressor','HuberRegressor',
@@ -61,9 +63,8 @@ re_list = reg_list.sort()
 
 #Start of App Including Type and Raw Data
 st.title('Machine Learning Data Testing App')
+st.set_option('deprecation.showPyplotGlobalUse', False)
 
-#@st.cache(allow_output_mutation=True,suppress_st_warning=True)
-#def data_import():
 file =  st.file_uploader('Upload your data file (must be CSV)')
 
 if file is not None:
@@ -72,44 +73,65 @@ if file is not None:
     params_num_col = data.select_dtypes(np.number)
     params_cat_col = data.select_dtypes(object)
     
-    col001, col002, col003  = st.beta_columns([1,1,1])
+    col001, col002, col003,col004  = st.beta_columns([2,2,1,1])
     with col001:
         x_params_num = st.multiselect('Numerical Input Values', params_num_col.columns)
     with col002:
         x_params_cat = st.multiselect('Categorical Input Values', params_cat_col.columns)
     with col003:
         y_params = st.selectbox('Model Parameter', params_num_col.columns)
-    
+    with col004:
+       st_dev_filt = st.number_input('Std. Deviation Filter to Remove Values > x St. Dev',
+                            min_value = 0, 
+                            max_value = 100,
+                            value = 3,
+                            step=1)
+       
+      
     df = pd.DataFrame()
+    
     if x_params_num is not None:
         df[x_params_num] = data[x_params_num]
     if x_params_cat is not None:
         df[x_params_cat] = data[x_params_cat]
     if y_params is not None:
         df[y_params] = data[y_params]
-        min_val = float(np.min(df[y_params]))
-        max_val = float(np.max(df[y_params]))
-        
-        col11, col12, col13= st.beta_columns([1,1,1])
-        with col11:
-            min_filt = st.number_input('Minimum Filter Value for Model Parameter, Data Min: '+str(np.round(min_val,2)),
-                                 min_value = min_val,
-                                 max_value = max_val,
-                                 value = min_val,
-                                 step = 1.0,
-                                 )
-        with col12:
-           max_filt = st.number_input('Maximum Filter Value for Model Parameter, Data Min: '+str(np.round(max_val,2)),
-                                 min_value = min_val,
-                                 max_value = max_val,
-                                 value = max_val,
-                                 step = 1.0,
-                                 )
-        df = df[(df[y_params]>min_filt) & (df[y_params]<max_filt)]
     
+    df = df[(np.abs(df-df.mean()) <= (st_dev_filt*df.std()))].dropna()
+    
+       # if y_params is not None: 
+       #     min_val = float(np.min(df[y_params]))
+       #     max_val = float(np.max(df[y_params]))
+           
+    # with col12:
+    #     min_filt = st.number_input('Minimum Filter Value for Model Parameter, Data Min: '+str(np.round(min_val,2)),
+    #                          min_value = min_val,
+    #                          max_value = max_val,
+    #                          value = min_val,
+    #                          step = 1.0,
+    #                          )
+    # with col13:
+    #    max_filt = st.number_input('Maximum Filter Value for Model Parameter, Data Min: '+str(np.round(max_val,2)),
+    #                          min_value = min_val,
+    #                          max_value = max_val,
+    #                          value = max_val,
+    #                          step = 1.0,
+    #                          )
+    
+    #df = df[(df[y_params]>min_filt) & (df[y_params]<max_filt)]
     categorical_cols = x_params_cat
     data_g0 = pd.get_dummies(df, columns=categorical_cols)
-    
+     
+    data_expand = st.beta_expander("Show Data Table",expanded=True)
+        
+    with data_expand:
+        #Import the data table for viewing that will be modeled
+        st.subheader('Data Table - '+
+                     'Columns: '+str(len(df.columns))+
+                     ', Rows: '+str(len(df[y_params]))
+                     )
+        df
+        
     #Build x and y data sets
     data_drop = data_g0.dropna()
     datax = data_drop.drop(columns=y_params,axis=1)
@@ -119,7 +141,7 @@ if file is not None:
     
     t_size = st.sidebar.slider('Select Training Set Size %',0,100,50,key='t_size')
     
-    @st.cache(allow_output_mutation=True)
+    #@st.cache(allow_output_mutation=True)
     def pipeline():
         num_pipeline_minmax = Pipeline([
             ('imputer',SimpleImputer(strategy='median')),
@@ -137,20 +159,9 @@ if file is not None:
     
     if x_params_num or x_params_cat and y_params is not None: 
         train_setx,test_setx,train_sety,test_sety = pipeline()
-        
-        data_expand = st.beta_expander("Show Data Table",expanded=True)
-        
-        with data_expand:
-            #Import the data table for viewing that will be modeled
-            st.subheader('Data Table - '+
-                         'Columns: '+str(len(df.columns))+
-                         ', Rows: '+str(len(df[y_params]))
-                         )
-            df
+       
         
         #Build Regression Selection to select regression type
-        
-        
         fit_type = st.sidebar.selectbox('Select Regression Type',reg_list)
     
         #Build the regression model and call the regression
@@ -183,10 +194,11 @@ if file is not None:
             lin_rmse = np.sqrt(lin_mse)
         
             return lin_rmse
-        
-        regplots_expand = st.beta_expander("Show Regression Plots",expanded=True)
+            
+        regplots_expand = st.beta_expander("Show Regression Plots",expanded=False)
         #Build Columns for regression fit data and plotting 
-
+    
+        n=10
         with regplots_expand:
             col01, col02, col03 = st.beta_columns([1,1,1])
         
@@ -225,8 +237,9 @@ if file is not None:
                 plot = sns.regplot(x=df_plot['data'][df_plot['label'] =='actual'],
                               y=df_plot['data'][df_plot['label'] =='predicted'],
                               )
-                plot.set_xlim(left=min_filt, right=max_filt)
-                plot.set_ylim(bottom=min_filt, top=max_filt)
+                
+               # plot.set_xlim(left=min_filt, right=max_filt)
+               # plot.set_ylim(bottom=min_filt, top=max_filt)
                 plot.set(xlabel='Actual Value', ylabel='Predicted Value',title='Regression Fit Scatterplot')
                 fig = plot.get_figure()
                 
@@ -242,7 +255,7 @@ if file is not None:
                 st.pyplot(fig2,clear_figure=True)
         
         
-        grid_expand = st.beta_expander("Show Grid Search Optimization",expanded=True)
+        grid_expand = st.beta_expander("Show Grid Search Optimization",expanded=False)
         with grid_expand:
             grid_params = st.multiselect('Select GridSearch Params', d2.keys())
             grid_dict = {}
@@ -303,7 +316,7 @@ if file is not None:
                  return regpar.predict(dat)
          
                 
-        xyzplot_expand = st.beta_expander("Show Parameter 3D Plotting",expanded=True)
+        xyzplot_expand = st.beta_expander("Show Parameter 3D Plotting",expanded=False)
         with xyzplot_expand:
             col001a, col002a, col003a = st.beta_columns([1,1,1])
             
@@ -354,7 +367,7 @@ if file is not None:
                     
                     cmap = cm.get_cmap('jet') # Get desired colormap
                     max_height = np.max(dz)   # get range of colorbars
-                    min_height = np.min(dz)
+                    min_height = np.min(Zi)
     
                     # scale each z to [0,1], and get their rgb values
                     
@@ -420,7 +433,7 @@ if file is not None:
                     
                     cmap = cm.get_cmap('jet') # Get desired colormap
                     max_height2 = np.max(dz2)   # get range of colorbars
-                    min_height2 = np.min(dz2)
+                    min_height2 = np.min(Zi2)
     
                     # scale each z to [0,1], and get their rgb values
                     rgba2 = [cmap((k-min_height2)/max_height2) for k in dz2] 
@@ -448,7 +461,13 @@ if file is not None:
                     # ax4.set_ylim(np.min(Y2),np.max(Y2))
                     # ax4.set_zlabel(y_params)
                     # st.pyplot(fig4,clear_figure=True)
-                    
+        
+        pair_plots = st.beta_expander("Show Pairplots for Comparative Data Analysis",expanded=False)
+        #Build Columns for regression fit data and plotting 
+        with pair_plots:
+                
+                sns.pairplot(df)
+                st.pyplot(clear_figure=True)                        
                     
          
             
